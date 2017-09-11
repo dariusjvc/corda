@@ -1,9 +1,11 @@
 package net.corda.node.testing
 
 import com.codahale.metrics.MetricRegistry
+import net.corda.core.concurrent.CordaFuture
 import net.corda.core.flows.FlowInitiator
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.Party
+import net.corda.core.internal.FlowStateMachine
 import net.corda.core.node.NodeInfo
 import net.corda.core.node.StateLoader
 import net.corda.core.node.services.*
@@ -17,8 +19,7 @@ import net.corda.node.serialization.NodeClock
 import net.corda.node.services.api.*
 import net.corda.node.services.config.NodeConfiguration
 import net.corda.node.services.messaging.MessagingService
-import net.corda.node.services.statemachine.FlowStateMachineImpl
-import net.corda.node.services.statemachine.StateMachineManager
+import net.corda.node.services.statemachine.StateMachineManagerImpl
 import net.corda.node.services.transactions.InMemoryTransactionVerifierService
 import net.corda.node.utilities.CordaPersistence
 import net.corda.testing.DUMMY_IDENTITY_1
@@ -76,12 +77,12 @@ open class MockServiceHubInternal(
     override val schemaService get() = throw UnsupportedOperationException()
     override val auditService: AuditService = DummyAuditService()
 
-    lateinit var smm: StateMachineManager
+    lateinit var smm: StateMachineManagerImpl
 
     override fun <T : SerializeAsToken> cordaService(type: Class<T>): T = throw UnsupportedOperationException()
 
-    override fun <T> startFlow(logic: FlowLogic<T>, flowInitiator: FlowInitiator, ourIdentity: Party?): FlowStateMachineImpl<T> {
-        return smm.executor.fetchFrom { smm.add(logic, flowInitiator, ourIdentity) }
+    override fun <T> startFlow(logic: FlowLogic<T>, flowInitiator: FlowInitiator, ourIdentity: Party?): CordaFuture<FlowStateMachine<T>> {
+        return smm.executor.fetchFrom { smm.startFlow(logic, flowInitiator, ourIdentity) }
     }
 
     override fun getFlowFactory(initiatingFlowClass: Class<out FlowLogic<*>>): InitiatedFlowFactory<*>? = null

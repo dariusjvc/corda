@@ -19,6 +19,7 @@ import net.corda.node.services.identity.InMemoryIdentityService
 import net.corda.node.services.persistence.DBCheckpointStorage
 import net.corda.node.services.statemachine.FlowLogicRefFactoryImpl
 import net.corda.node.services.statemachine.StateMachineManager
+import net.corda.node.services.statemachine.StateMachineManagerImpl
 import net.corda.node.services.vault.NodeVaultService
 import net.corda.node.testing.MockServiceHubInternal
 import net.corda.node.utilities.AffinityExecutor
@@ -101,7 +102,7 @@ class NodeSchedulerServiceTest : SingletonSerializeAsToken() {
             }
             smmExecutor = AffinityExecutor.ServiceAffinityExecutor("test", 1)
             scheduler = NodeSchedulerService(services, schedulerGatedExecutor, serverThread = smmExecutor)
-            val mockSMM = StateMachineManager(services, DBCheckpointStorage(), smmExecutor, database)
+            val mockSMM = StateMachineManagerImpl(services, DBCheckpointStorage(), smmExecutor, database, emptyList())
             mockSMM.changes.subscribe { change ->
                 if (change is StateMachineManager.Change.Removed && mockSMM.allStateMachines.isEmpty()) {
                     smmHasRemovedAllFlows.countDown()

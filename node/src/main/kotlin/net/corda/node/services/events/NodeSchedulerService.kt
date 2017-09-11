@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import co.paralleluniverse.strands.SettableFuture as QuasarSettableFuture
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture as GuavaSettableFuture
+import com.google.common.util.concurrent.SettableFuture
 import net.corda.core.contracts.SchedulableState
 import net.corda.core.contracts.ScheduledActivity
 import net.corda.core.contracts.ScheduledStateRef
@@ -14,6 +15,7 @@ import net.corda.core.flows.FlowLogic
 import net.corda.core.internal.ThreadBox
 import net.corda.core.internal.VisibleForTesting
 import net.corda.core.internal.until
+import net.corda.core.internal.concurrent.flatMap
 import net.corda.core.schemas.PersistentStateRef
 import net.corda.core.serialization.SingletonSerializeAsToken
 import net.corda.core.utilities.loggerFor
@@ -211,7 +213,7 @@ class NodeSchedulerService(private val services: ServiceHubInternal,
      * cancelled then we run the scheduled action.  Finally we remove that action from the scheduled actions and
      * recompute the next scheduled action.
      */
-    internal fun rescheduleWakeUp() {
+    private fun rescheduleWakeUp() {
         // Note, we already have the mutex but we need the scope again here
         val (scheduledState, ourRescheduledFuture) = mutex.alreadyLocked {
             rescheduled?.cancel(false)
@@ -241,7 +243,7 @@ class NodeSchedulerService(private val services: ServiceHubInternal,
                     val scheduledFlow = getScheduledFlow(scheduledState)
                     if (scheduledFlow != null) {
                         flowName = scheduledFlow.javaClass.name
-                        val future = services.startFlow(scheduledFlow, FlowInitiator.Scheduled(scheduledState)).resultFuture
+                        val future = services.startFlow(scheduledFlow, FlowInitiator.Scheduled(scheduledState)).flatMap { it.resultFuture }
                         future.then {
                             unfinishedSchedules.countDown()
                         }
@@ -267,7 +269,7 @@ class NodeSchedulerService(private val services: ServiceHubInternal,
                     scheduledStatesQueue.remove(scheduledState)
                 } else if (scheduledActivity.scheduledAt.isAfter(services.clock.instant())) {
                     log.info("Scheduled state $scheduledState has rescheduled to ${scheduledActivity.scheduledAt}.")
-                    var newState = ScheduledStateRef(scheduledState.ref, scheduledActivity.scheduledAt)
+                    val newState = ScheduledStateRef(scheduledState.ref, scheduledActivity.scheduledAt)
                     scheduledStates[scheduledState.ref] = newState
                     scheduledStatesQueue.remove(scheduledState)
                     scheduledStatesQueue.add(newState)

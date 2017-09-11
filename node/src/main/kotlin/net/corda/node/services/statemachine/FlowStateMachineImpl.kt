@@ -165,7 +165,7 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
     }
 
     @Suspendable
-    override fun getFlowInfo(otherParty: Party, sessionFlow: FlowLogic<*>): FlowInfo {
+    override fun getFlowInfo(otherParty: Party, sessionFlow: FlowLogic<*>, maySkipCheckpoint: Boolean): FlowInfo {
         val state = getConfirmedSession(otherParty, sessionFlow).state as FlowSessionState.Initiated
         return state.context
     }
@@ -175,7 +175,8 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
                                           otherParty: Party,
                                           payload: Any,
                                           sessionFlow: FlowLogic<*>,
-                                          retrySend: Boolean): UntrustworthyData<T> {
+                                          retrySend: Boolean,
+                                          maySkipCheckpoint: Boolean): UntrustworthyData<T> {
         requireNonPrimitive(receiveType)
         logger.debug { "sendAndReceive(${receiveType.name}, $otherParty, ${payload.toString().abbreviate(300)}) ..." }
         val session = getConfirmedSessionIfPresent(otherParty, sessionFlow)
@@ -194,7 +195,8 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
     @Suspendable
     override fun <T : Any> receive(receiveType: Class<T>,
                                    otherParty: Party,
-                                   sessionFlow: FlowLogic<*>): UntrustworthyData<T> {
+                                   sessionFlow: FlowLogic<*>,
+                                   maySkipCheckpoint: Boolean): UntrustworthyData<T> {
         requireNonPrimitive(receiveType)
         logger.debug { "receive(${receiveType.name}, $otherParty) ..." }
         val session = getConfirmedSession(otherParty, sessionFlow)
@@ -210,7 +212,7 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
     }
 
     @Suspendable
-    override fun send(otherParty: Party, payload: Any, sessionFlow: FlowLogic<*>) {
+    override fun send(otherParty: Party, payload: Any, sessionFlow: FlowLogic<*>, maySkipCheckpoint: Boolean) {
         logger.debug { "send($otherParty, ${payload.toString().abbreviate(300)})" }
         val session = getConfirmedSessionIfPresent(otherParty, sessionFlow)
         if (session == null) {
@@ -222,7 +224,7 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
     }
 
     @Suspendable
-    override fun waitForLedgerCommit(hash: SecureHash, sessionFlow: FlowLogic<*>): SignedTransaction {
+    override fun waitForLedgerCommit(hash: SecureHash, sessionFlow: FlowLogic<*>, maySkipCheckpoint: Boolean): SignedTransaction {
         logger.debug { "waitForLedgerCommit($hash) ..." }
         suspend(WaitForLedgerCommit(hash, sessionFlow.stateMachine as FlowStateMachineImpl<*>))
         val stx = serviceHub.validatedTransactions.getTransaction(hash)

@@ -63,6 +63,10 @@ class FlowFrameworkTests {
     private lateinit var notary: StartedNode<MockNode>
     private lateinit var notaryIdentity: Party
 
+    private fun StartedNode<*>.flushSmm() {
+        (this.smm as StateMachineManagerImpl).executor.flush()
+    }
+
     @Before
     fun start() {
         mockNet = MockNetwork(servicePeerAllocationStrategy = RoundRobin(), cordappPackages = listOf("net.corda.finance.contracts", "net.corda.testing.contracts"))
@@ -161,7 +165,7 @@ class FlowFrameworkTests {
         val restoredFlow = node3.getSingleFlow<NoOpFlow>().first
         assertEquals(false, restoredFlow.flowStarted) // Not started yet as no network activity has been allowed yet
         mockNet.runNetwork() // Allow network map messages to flow
-        node3.smm.executor.flush()
+        node3.flushSmm()
         assertEquals(true, restoredFlow.flowStarted) // Now we should have run the flow and hopefully cleared the init checkpoint
         node3.internals.disableDBCloseOnStop()
         node3.services.networkMapCache.clearNetworkMapCache() // zap persisted NetworkMapCache to force use of network.
@@ -170,7 +174,7 @@ class FlowFrameworkTests {
         // Now it is completed the flow should leave no Checkpoint.
         node3 = mockNet.createNode(node3.internals.id)
         mockNet.runNetwork() // Allow network map messages to flow
-        node3.smm.executor.flush()
+        node3.flushSmm()
         assertTrue(node3.smm.findStateMachines(NoOpFlow::class.java).isEmpty())
     }
 
@@ -179,7 +183,7 @@ class FlowFrameworkTests {
         node1.registerFlowFactory(ReceiveFlow::class) { InitiatedSendFlow("Hello", it) }
         node2.services.startFlow(ReceiveFlow(node1.info.chooseIdentity()).nonTerminating()) // Prepare checkpointed receive flow
         // Make sure the add() has finished initial processing.
-        node2.smm.executor.flush()
+        node2.flushSmm()
         node2.internals.disableDBCloseOnStop()
         node2.dispose() // kill receiver
         val restoredFlow = node2.restartAndGetRestoredFlow<ReceiveFlow>()
@@ -204,7 +208,7 @@ class FlowFrameworkTests {
             assertEquals(1, node2.checkpointStorage.checkpoints().size)
         }
         // Make sure the add() has finished initial processing.
-        node2.smm.executor.flush()
+        node2.flushSmm()
         node2.internals.disableDBCloseOnStop()
         // Restart node and thus reload the checkpoint and resend the message with same UUID
         node2.dispose()
@@ -217,7 +221,7 @@ class FlowFrameworkTests {
         val (firstAgain, fut1) = node2b.getSingleFlow<PingPongFlow>()
         // Run the network which will also fire up the second flow. First message should get deduped. So message data stays in sync.
         mockNet.runNetwork()
-        node2b.smm.executor.flush()
+        node2b.flushSmm()
         fut1.getOrThrow()
 
         val receivedCount = receivedSessionMessages.count { it.isPayloadTransfer }
@@ -721,7 +725,7 @@ class FlowFrameworkTests {
     private fun StartedNode<*>.sendSessionMessage(message: SessionMessage, destination: StartedNode<*>) {
         services.networkService.apply {
             val address = getAddressOfParty(PartyInfo.SingleNode(destination.info.chooseIdentity(), emptyList()))
-            send(createMessage(StateMachineManager.sessionTopic, message.serialize().bytes), address)
+            send(createMessage(StateMachineManagerImpl.sessionTopic, message.serialize().bytes), address)
         }
     }
 
@@ -745,7 +749,7 @@ class FlowFrameworkTests {
     }
 
     private fun Observable<MessageTransfer>.toSessionTransfers(): Observable<SessionTransfer> {
-        return filter { it.message.topicSession == StateMachineManager.sessionTopic }.map {
+        return filter { it.message.topicSession == StateMachineManagerImpl.sessionTopic }.map {
             val from = it.sender.id
             val message = it.message.data.deserialize<SessionMessage>()
             SessionTransfer(from, sanitise(message), it.recipients)

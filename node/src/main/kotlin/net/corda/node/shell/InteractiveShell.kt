@@ -20,6 +20,7 @@ import net.corda.core.internal.write
 import net.corda.core.internal.*
 import net.corda.core.messaging.CordaRPCOps
 import net.corda.core.messaging.StateMachineUpdate
+import net.corda.core.utilities.getOrThrow
 import net.corda.core.utilities.loggerFor
 import net.corda.client.jackson.JacksonSupport
 import net.corda.client.jackson.StringToMethodCallParser
@@ -237,7 +238,7 @@ object InteractiveShell {
         val clazz: Class<FlowLogic<*>> = uncheckedCast(matches.single())
         try {
             // TODO Flow invocation should use startFlowDynamic.
-            val fsm = runFlowFromString({ node.services.startFlow(it, FlowInitiator.Shell) }, inputData, clazz)
+            val fsm = runFlowFromString({ node.services.startFlow(it, FlowInitiator.Shell).getOrThrow() }, inputData, clazz)
             // Show the progress tracker on the console until the flow completes or is interrupted with a
             // Ctrl-C keypress.
             val latch = CountDownLatch(1)
