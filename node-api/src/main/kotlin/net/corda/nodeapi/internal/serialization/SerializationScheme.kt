@@ -111,7 +111,7 @@ open class SerializationFactoryImpl : SerializationFactory() {
             registeredSchemes
                     .filter { scheme -> scheme.canDeserializeVersion(it.first, it.second) }
                     .forEach { return@computeIfAbsent it }
-            logger.warn("Cannot find serialization scheme for: $lookupKey")
+            logger.warn("Cannot find serialization scheme for: $lookupKey, registeredSchemes are: $registeredSchemes")
             NotSupportedSerializationScheme
         }
     }
