@@ -94,6 +94,8 @@ data class SerializationContextImpl(override val preferredSerializationVersion: 
 
 private const val HEADER_SIZE: Int = 8
 
+fun ByteSequence.obtainHeaderSignature() = take(HEADER_SIZE).copy()
+
 open class SerializationFactoryImpl : SerializationFactory() {
     private val creator: List<StackTraceElement> = Exception().stackTrace.asList()
 
@@ -106,7 +108,7 @@ open class SerializationFactoryImpl : SerializationFactory() {
 
     private fun schemeFor(byteSequence: ByteSequence, target: SerializationContext.UseCase): SerializationScheme {
         // truncate sequence to 8 bytes, and make sure it's a copy to avoid holding onto large ByteArrays
-        val lookupKey = byteSequence.take(HEADER_SIZE).copy() to target
+        val lookupKey = byteSequence.obtainHeaderSignature() to target
         return schemes.computeIfAbsent(lookupKey) {
             registeredSchemes
                     .filter { scheme -> scheme.canDeserializeVersion(it.first, it.second) }
