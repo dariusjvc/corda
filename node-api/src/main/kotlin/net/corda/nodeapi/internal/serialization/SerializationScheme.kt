@@ -19,6 +19,7 @@ import net.corda.core.serialization.*
 import net.corda.core.utilities.ByteSequence
 import net.corda.core.utilities.OpaqueBytes
 import net.corda.nodeapi.internal.AttachmentsClassLoader
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.NotSerializableException
 import java.util.*
@@ -98,15 +99,19 @@ open class SerializationFactoryImpl : SerializationFactory() {
 
     private val registeredSchemes: MutableCollection<SerializationScheme> = Collections.synchronizedCollection(mutableListOf())
 
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     // TODO: This is read-mostly. Probably a faster implementation to be found.
     private val schemes: ConcurrentHashMap<Pair<ByteSequence, SerializationContext.UseCase>, SerializationScheme> = ConcurrentHashMap()
 
     private fun schemeFor(byteSequence: ByteSequence, target: SerializationContext.UseCase): SerializationScheme {
         // truncate sequence to 8 bytes, and make sure it's a copy to avoid holding onto large ByteArrays
-        return schemes.computeIfAbsent(byteSequence.take(HEADER_SIZE).copy() to target) {
+        val lookupKey = byteSequence.take(HEADER_SIZE).copy() to target
+        return schemes.computeIfAbsent(lookupKey) {
             registeredSchemes
                     .filter { scheme -> scheme.canDeserializeVersion(it.first, it.second) }
                     .forEach { return@computeIfAbsent it }
+            logger.warn("Cannot find serialization scheme for: $lookupKey")
             NotSupportedSerializationScheme
         }
     }
