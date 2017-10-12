@@ -4,7 +4,6 @@ import net.corda.core.identity.AbstractParty
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
 import net.corda.core.serialization.CordaSerializable
-import org.hibernate.annotations.Type
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Index
@@ -28,7 +27,6 @@ object CashSchemaV1 : MappedSchema(schemaFamily = CashSchema.javaClass, version 
     class PersistentCashState(
             /** X500Name of owner party **/
             @Column(name = "owner_name")
-            @Type(type = "party")
             var owner: AbstractParty,
 
             @Column(name = "pennies")
