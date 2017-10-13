@@ -156,12 +156,14 @@ open class Cordform : DefaultTask() {
         val generateTimeout = 120L
         val processes = nodes.map { node ->
             project.logger.info("Generating node info for ${fullNodePath(node)}")
+            val logDir = File(fullNodePath(node).toFile(), "logs")
+            logDir.mkdirs() // Directory may not exist at this point
             Pair(node, ProcessBuilder("java", "-jar", Node.nodeJarName, "--just-generate-node-info")
                     .directory(fullNodePath(node).toFile())
                     .redirectErrorStream(true)
                     // InheritIO causes hangs on windows due the gradle buffer also not being flushed.
                     // Must redirect to output or logger (node log is still written, this is just startup banner)
-                    .redirectOutput(File(project.buildDir, "tmp/node-log.txt"))
+                    .redirectOutput(File(logDir, "generate-info-log.txt"))
                     .start())
         }
         try {
