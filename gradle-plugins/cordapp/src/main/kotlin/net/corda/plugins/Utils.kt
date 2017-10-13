@@ -5,8 +5,12 @@ import org.gradle.api.Task
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.plugins.ExtraPropertiesExtension
 
+/**
+ * Mimics the "project.ext" functionality in groovy which provides a direct
+ * accessor to the "ext" extention (See: ExtraPropertiesExtension)
+ */
 @Suppress("UNCHECKED_CAST")
-fun<T : Any> Project.ext(name: String): T = (extensions.findByName("ext") as ExtraPropertiesExtension).get(name) as T
+fun <T : Any> Project.ext(name: String): T = (extensions.findByName("ext") as ExtraPropertiesExtension).get(name) as T
 fun Project.configuration(name: String): Configuration = configurations.single { it.name == name }
 
 class Utils {

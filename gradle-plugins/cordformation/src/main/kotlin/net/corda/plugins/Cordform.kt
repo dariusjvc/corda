@@ -1,13 +1,13 @@
 package net.corda.plugins
 
 import groovy.lang.Closure
-import org.gradle.api.tasks.SourceSet.MAIN_SOURCE_SET_NAME
 import net.corda.cordform.CordformDefinition
 import net.corda.cordform.CordformNode
 import org.apache.tools.ant.filters.FixCrLfFilter
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.plugins.JavaPluginConvention
+import org.gradle.api.tasks.SourceSet.MAIN_SOURCE_SET_NAME
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 import java.net.URLClassLoader
@@ -20,7 +20,12 @@ import java.util.concurrent.TimeUnit
  *
  * See documentation for examples.
  */
+@Suppress("unused")
 open class Cordform : DefaultTask() {
+    private companion object {
+        val executableFileMode = "0755".toInt(8)
+    }
+
     /**
      * Optionally the name of a CordformDefinition subclass to which all configuration will be delegated.
      */
@@ -34,7 +39,6 @@ open class Cordform : DefaultTask() {
      *
      * @param directory The directory the nodes will be installed into.
      */
-    @Suppress("unused")
     fun directory(directory: String) {
         this.directory = Paths.get(directory)
     }
@@ -45,7 +49,7 @@ open class Cordform : DefaultTask() {
      * @param configureClosure A node configuration that will be deployed.
      */
     @Suppress("MemberVisibilityCanPrivate")
-    fun node(configureClosure: Closure<Node>) {
+    fun node(configureClosure: Closure<in Node>) {
         nodes += project.configure(Node(project), configureClosure) as Node
     }
 
@@ -55,10 +59,10 @@ open class Cordform : DefaultTask() {
      * @param configureFunc A node configuration that will be deployed
      */
     @Suppress("MemberVisibilityCanPrivate")
-    fun node(configureFunc: Node.() -> Unit) {
-        val node = Node(project)
-        node.configureFunc()
+    fun node(configureFunc: Node.() -> Any?): Node {
+        val node = Node(project).apply { configureFunc() }
         nodes += node
+        return node
     }
 
     /**
@@ -76,7 +80,7 @@ open class Cordform : DefaultTask() {
         project.copy {
             it.apply {
                 from(Cordformation.getPluginFile(project, "net/corda/plugins/runnodes.jar"))
-                fileMode = "0755".toInt(16)
+                fileMode = executableFileMode
                 into("$directory/")
             }
         }
@@ -86,7 +90,7 @@ open class Cordform : DefaultTask() {
                 from(Cordformation.getPluginFile(project, "net/corda/plugins/runnodes"))
                 // Replaces end of line with lf to avoid issues with the bash interpreter and Windows style line endings.
                 filter(mapOf("eol" to FixCrLfFilter.CrLf.newInstance("lf")), FixCrLfFilter::class.java)
-                fileMode = "0755".toInt(16)
+                fileMode = executableFileMode
                 into("$directory/")
             }
         }
@@ -106,7 +110,7 @@ open class Cordform : DefaultTask() {
         val plugin = project.convention.getPlugin(JavaPluginConvention::class.java)
         val classpath = plugin.sourceSets.getByName(MAIN_SOURCE_SET_NAME).runtimeClasspath
         val urls = classpath.files.map { it.toURI().toURL() }.toTypedArray()
-        return URLClassLoader(urls, javaClass.classLoader)
+        return URLClassLoader(urls, CordformDefinition::class.java.classLoader)
                 .loadClass(definitionClass)
                 .asSubclass(CordformDefinition::class.java)
                 .newInstance()
@@ -121,22 +125,19 @@ open class Cordform : DefaultTask() {
         project.logger.info("Running Cordform task")
         initializeConfiguration()
         installRunScript()
-        nodes.forEach {
-            it.build()
-        }
+        nodes.forEach(Node::build)
         generateAndInstallNodeInfos()
     }
 
     private fun initializeConfiguration() {
         if (null != definitionClass) {
             val cd = loadCordformDefinition()
-            cd.nodeConfigurers.forEach { nc ->
-                node {
-                    nc.accept(this)
+            cd.nodeConfigurers.forEach {
+                it.accept(node {
                     rootDir(directory)
-                }
+                })
             }
-            cd.setup { nodeName -> project.projectDir.toPath().resolve(getNodeByName(nodeName)?.nodeDir?.toPath()) }
+            cd.setup { nodeName -> project.projectDir.toPath().resolve(getNodeByName(nodeName)!!.nodeDir?.toPath()) }
         } else {
             nodes.forEach {
                 it.rootDir(directory)
@@ -153,7 +154,7 @@ open class Cordform : DefaultTask() {
 
     private fun generateNodeInfos() {
         project.logger.info("Generating node infos")
-        val generateTimeout = 120L
+        val generateTimeout = 60L
         val processes = nodes.map { node ->
             project.logger.info("Generating node info for ${fullNodePath(node)}")
             val logDir = File(fullNodePath(node).toFile(), "logs")
@@ -167,7 +168,7 @@ open class Cordform : DefaultTask() {
                     .start())
         }
         try {
-            processes.forEach { (node, process) ->
+            processes.parallelStream().forEach { (node, process) ->
                 if (!process.waitFor(generateTimeout, TimeUnit.SECONDS)) {
                     throw GradleException("Node took longer $generateTimeout seconds than too to generate node info - see node log at ${fullNodePath(node)}/logs")
                 } else if (process.exitValue() != 0) {
@@ -175,6 +176,7 @@ open class Cordform : DefaultTask() {
                 }
             }
         } finally {
+            // This will be a no-op on success - abort remaining on failure
             processes.forEach {
                 it.second.destroyForcibly()
             }
@@ -182,7 +184,7 @@ open class Cordform : DefaultTask() {
     }
 
     private fun installNodeInfos() {
-        project.logger.info("Node infos generated")
+        project.logger.info("Installing node infos")
         for (source in nodes) {
             for (destination in nodes) {
                 if (source.nodeDir != destination.nodeDir) {

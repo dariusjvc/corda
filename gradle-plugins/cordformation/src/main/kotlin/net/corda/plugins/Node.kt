@@ -72,7 +72,7 @@ class Node(private val project: Project) : CordformNode() {
      * @param networkMapAddress Network map node address.
      * @param networkMapLegalName Network map node legal name.
      */
-    fun networkMapAddress(networkMapAddress: String, networkMapLegalName: String ) {
+    fun networkMapAddress(networkMapAddress: String, networkMapLegalName: String) {
         val networkMapService = mutableMapOf<String, String>()
         networkMapService.put("address", networkMapAddress)
         networkMapService.put("legalName", networkMapLegalName)
@@ -222,7 +222,7 @@ class Node(private val project: Project) : CordformNode() {
                 project.logger.error("$configFileProperty '$optionalConfig' not found")
             } else {
                 val confFile = File(project.buildDir.path + "/../" + nodeDir, "node.conf")
-                optionalConfig.appendBytes(confFile.readBytes())
+                confFile.appendBytes(optionalConfig.readBytes())
             }
         }
     }
