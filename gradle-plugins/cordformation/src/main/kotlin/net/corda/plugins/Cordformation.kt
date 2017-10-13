@@ -23,6 +23,8 @@ class Cordformation : Plugin<Project> {
             }
             return project.rootProject.resources.text.fromArchiveEntry(archive, filePathInJar).asFile()
         }
+
+        val executableFileMode = "0755".toInt(8)
     }
 
     override fun apply(project: Project) {

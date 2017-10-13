@@ -22,10 +22,6 @@ import java.util.concurrent.TimeUnit
  */
 @Suppress("unused")
 open class Cordform : DefaultTask() {
-    private companion object {
-        val executableFileMode = "0755".toInt(8)
-    }
-
     /**
      * Optionally the name of a CordformDefinition subclass to which all configuration will be delegated.
      */
@@ -80,7 +76,7 @@ open class Cordform : DefaultTask() {
         project.copy {
             it.apply {
                 from(Cordformation.getPluginFile(project, "net/corda/plugins/runnodes.jar"))
-                fileMode = executableFileMode
+                fileMode = Cordformation.executableFileMode
                 into("$directory/")
             }
         }
@@ -90,7 +86,7 @@ open class Cordform : DefaultTask() {
                 from(Cordformation.getPluginFile(project, "net/corda/plugins/runnodes"))
                 // Replaces end of line with lf to avoid issues with the bash interpreter and Windows style line endings.
                 filter(mapOf("eol" to FixCrLfFilter.CrLf.newInstance("lf")), FixCrLfFilter::class.java)
-                fileMode = executableFileMode
+                fileMode = Cordformation.executableFileMode
                 into("$directory/")
             }
         }
@@ -137,7 +133,7 @@ open class Cordform : DefaultTask() {
                     rootDir(directory)
                 })
             }
-            cd.setup { nodeName -> project.projectDir.toPath().resolve(getNodeByName(nodeName)!!.nodeDir?.toPath()) }
+            cd.setup { nodeName -> project.projectDir.toPath().resolve(getNodeByName(nodeName)!!.nodeDir.toPath()) }
         } else {
             nodes.forEach {
                 it.rootDir(directory)
@@ -154,7 +150,7 @@ open class Cordform : DefaultTask() {
 
     private fun generateNodeInfos() {
         project.logger.info("Generating node infos")
-        val generateTimeout = 60L
+        val generateTimeoutSeconds = 60L
         val processes = nodes.map { node ->
             project.logger.info("Generating node info for ${fullNodePath(node)}")
             val logDir = File(fullNodePath(node).toFile(), "logs")
@@ -169,8 +165,8 @@ open class Cordform : DefaultTask() {
         }
         try {
             processes.parallelStream().forEach { (node, process) ->
-                if (!process.waitFor(generateTimeout, TimeUnit.SECONDS)) {
-                    throw GradleException("Node took longer $generateTimeout seconds than too to generate node info - see node log at ${fullNodePath(node)}/logs")
+                if (!process.waitFor(generateTimeoutSeconds, TimeUnit.SECONDS)) {
+                    throw GradleException("Node took longer $generateTimeoutSeconds seconds than too to generate node info - see node log at ${fullNodePath(node)}/logs")
                 } else if (process.exitValue() != 0) {
                     throw GradleException("Node exited with ${process.exitValue()} when generating node infos - see node log at ${fullNodePath(node)}/logs")
                 }

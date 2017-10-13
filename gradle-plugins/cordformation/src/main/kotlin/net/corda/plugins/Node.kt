@@ -140,7 +140,7 @@ class Node(private val project: Project) : CordformNode() {
                 from(cordaJar)
                 into(nodeDir)
                 rename(cordaJar.name, nodeJarName)
-                fileMode = "0755".toInt(16)
+                fileMode = Cordformation.executableFileMode
             }
         }
     }
